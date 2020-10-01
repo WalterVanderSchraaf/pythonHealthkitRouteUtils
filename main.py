@@ -4,16 +4,21 @@
 # !/usr/bin/env python
 
 import sys
+import os
 from xml.dom import minidom
 import lxml.html as etree
-
+import json
+from pandas import json_normalize
 
 filename = "DevonHealthKit_20200928.xml"
 username = "Devon"
 userid = "3"
+file_locations = "tblLocations.json"
+file_location = "tblLocation.json"
+download_folder = os.path.expanduser("~")+"/Downloads/"
 
 
-def main():
+def mainHealthKitToSqlite():
     # filename = sys.argv[1]
 
     newfilename = str(filename).replace(".xml", "_sqllite3.txt")
@@ -119,7 +124,7 @@ def main2():
     #  'HKQuantityTypeIdentifierDistanceWalkingRunning', 'HKQuantityTypeIdentifierFlightsClimbed'}
 
 
-def main3():
+def mainMySQLToSqlite():
     filename = sys.argv[1]
     newfilename = str(filename).replace(".txt", "_sqllite3.txt")
 
@@ -175,8 +180,79 @@ def main3():
     write_file.close()
 
 
+def convertlocationsToSqlite():
+
+    # [ locations.json
+    #     {
+    #         "Checked": "0",
+    #         "DateTime": "2020-03-23 12:34:46",
+    #         "HeartDuration": "",
+    #         "HeartIntensity": "",
+    #         "LocationsId": "4",
+    #         "LoginId": "0",
+    #         "MoveMinutes": "",
+    #         "Orderby": "",
+    #         "PathName": "Dog Walk",
+    #         "TotalDistance": "1.050377368927",
+    #         "TotalSteps": "565",
+    #         "Totaltime": "00:55:35",
+    #         "ZoomLevel": "16.4416980743408",
+    #         "ZoomToLatitude": "37.760930159238",
+    #         "ZoomToLongitude": "-122.4063430354"
+    #     }
+
+    # [ location.json
+    #     {
+    #         "Accuracy": "",
+    #         "ActivityId": "",
+    #         "Altitude": "-6.7",
+    #         "ColorPath": "-16777216",
+    #         "DateTime": "2020-03-23 12:34:52",
+    #         "Latitude": "37.760385",
+    #         "LocationId": "54",
+    #         "LocationsId": "4",
+    #         "Longitude": "-122.4084233",
+    #         "TransitionId": ""
+    #     }
+    with open(download_folder + file_locations) as f:
+        locations_json = json.load(f)  # list object [{'Checked': '0', 'DateTime': '2020-03-23 12:34:46',   }]
+    f.close()
+    # for itm in locations_json:
+    #     print(itm)
+
+    with open(download_folder + file_location) as f:
+        location_json = json.load(f)
+    f.close()
+
+    # for rw in datajson:
+    #     print(rw['LocationsId'] + ' : ' + rw['DateTime'])
+    df_locations = json_normalize(locations_json)
+    df_location = json_normalize(location_json)
+    # df = df.sort_values(['LocationsId', "DateTime"], ascending=True)  # convert string id to int val then sort
+    # https://stackoverflow.com/questions/37693600/how-to-sort-dataframe-based-on-particular-stringcolumns-using-python-pandas
+    # df['sort'] = df['LocationsId'].str.extract(r'(\d)', expand=False).astype(int)
+    df_locations['sort'] = df_locations['LocationsId'].astype(int)
+    df_locations = df_locations.sort_values(['sort'], ascending=True)
+    df_location['sort'] = df_location['LocationId'].astype(int)
+    df_location = df_location.sort_values(['sort'], ascending=True)
+
+    # df = df.sort_values(['LocationsId'], ascending=True)
+    # df = df.sort_values(['date'], ascending=[1])
+    # print(df)
+    # for r1 in df:
+    #     print(r1)
+    for index, row in df_locations.iterrows():
+        print(row['sort'], row['LocationsId'] + ' ' + row['DateTime'])
+#       insert locations row
+#       insert relevant location rows
+        df_location1 = df_location.loc[(df_location['LocationsId'] == row['LocationsId'])]
+        for idx, rw in df_location1.iterrows():
+            print(rw['LocationId'] + ' ' + rw['Longitude'])
+
+
 if __name__ == '__main__':
-    main()
+    # main()
+    convertlocationsToSqlite()
 
 
 
