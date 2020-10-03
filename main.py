@@ -2,7 +2,7 @@
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 # !/usr/bin/env python
-
+from datetime import datetime
 import sys
 import os
 from xml.dom import minidom
@@ -16,6 +16,10 @@ userid = "3"
 file_locations = "tblLocations.json"
 file_location = "tblLocation.json"
 download_folder = os.path.expanduser("~")+"/Downloads/"
+
+django_prefix = 'getoutapp_'
+tblLocations = django_prefix + 'locations'
+tblLocation = django_prefix + 'location'
 
 
 def mainHealthKitToSqlite():
@@ -180,7 +184,7 @@ def mainMySQLToSqlite():
     write_file.close()
 
 
-def convertlocationsToSqlite():
+def convertlocationsSqliteJSONToSqlite():
 
     # [ locations.json
     #     {
@@ -241,18 +245,65 @@ def convertlocationsToSqlite():
     # print(df)
     # for r1 in df:
     #     print(r1)
+    now = datetime.now()
+    filedatepart = now.strftime("%Y%m%d%H%M")
+    write_file = open(download_folder + "jsonSqlite_locations" + filedatepart + ".txt", "w")
+    tmpCnt = 0
     for index, row in df_locations.iterrows():
         print(row['sort'], row['LocationsId'] + ' ' + row['DateTime'])
 #       insert locations row
+        ilogin_id = row['LoginId'] if row['LoginId'].__str__() != '0' else '1'
+        spathname = row['PathName']
+        sdatetime = row['DateTime']
+        izoomlevel = row['ZoomLevel'] if row['ZoomLevel'].__len__() != 0 else 'NULL'
+        izoomtolatitude = row['ZoomToLatitude'] if row['ZoomToLatitude'].__len__() != 0 else 'NULL'
+        izoomtolongitude = row['ZoomToLongitude'] if row['ZoomToLongitude'].__len__() != 0 else 'NULL'
+        stotaltime = row['Totaltime']
+        itotaldistance = row['TotalDistance']
+        itotalsteps = row['TotalSteps']if row['TotalSteps'].__len__() != 0 else '0'
+        iheartminutes = row['HeartDuration'] if row['HeartDuration'].__len__() != 0 else 'NULL'
+        iheartpts = row['HeartIntensity'] if row['HeartIntensity'].__len__() != 0 else 'NULL'
+        imoveminutes = row['MoveMinutes'] if row['MoveMinutes'].__len__() != 0 else 'NULL'
 #       insert relevant location rows
         df_location1 = df_location.loc[(df_location['LocationsId'] == row['LocationsId'])]
+        sSQLdjango = 'INSERT INTO ' + tblLocations + \
+        ' (id,login_id,pathname,datetime,zoomlevel,zoomtolatitude,zoomtolongitude,totaltime,totaldistance,totalsteps,' \
+        'heartminutes,heartpoints,moveminutes) SELECT (SELECT id FROM (SELECT MAX(id)+1 AS id FROM ' + \
+                     tblLocations + ') AS locsid),' + ilogin_id + ",'" + spathname + "','" + \
+                     sdatetime + "'," + izoomlevel + "," + izoomtolatitude + "," + \
+                     izoomtolongitude + ",'" + stotaltime + "'," + itotaldistance + "," + \
+                     itotalsteps + "," + iheartminutes + "," + iheartpts + "," + imoveminutes + \
+                     ' WHERE NOT EXISTS (SELECT * FROM ' + tblLocations + ' WHERE login_id = ' + \
+                     ilogin_id + " AND pathname = '" + spathname + "' AND datetime = '" + sdatetime + \
+                     "' LIMIT 1); \n"
+        # print(sSQLdjango)
+        write_file.write(sSQLdjango)
+        tmpCnt += 1
         for idx, rw in df_location1.iterrows():
-            print(rw['LocationId'] + ' ' + rw['Longitude'])
+            ilatitude = rw['Latitude']
+            ilongitude = rw['Longitude']
+            ialtitude = rw['Altitude']
+            iactivityid = rw['ActivityId'] if rw['ActivityId'].__len__() != 0 else '-1'
+            itransitionid = rw['TransitionId'] if rw['TransitionId'].__len__() != 0 else '-1'
+            icolorpath = rw['ColorPath']
+            iaccuracy = rw['Accuracy'] if rw['Accuracy'].__len__() != 0 else 'NULL'
+            sdatetime = rw['DateTime']
+            sSQLdjango2 = ""
+            sSQLdjango2 = 'INSERT INTO ' + tblLocation + ' VALUES (NULL,' + ilatitude + ',' + \
+                          ilongitude + ',' + ialtitude + ',' + iactivityid + ',' + itransitionid + ',' + icolorpath
+            sSQLdjango2 = sSQLdjango2 + ',' + iaccuracy + ',\''
+            sSQLdjango2 = sSQLdjango2 + sdatetime + "',"
+            sSQLdjango2 = sSQLdjango2 + '(SELECT id FROM (SELECT MAX(id) AS id FROM ' + tblLocations + ") AS locs1)); \n"
+            # print(sSQLdjango2)
+            write_file.write(sSQLdjango2)
+        if tmpCnt > 1:
+            break
 
+    write_file.close()
 
 if __name__ == '__main__':
     # main()
-    convertlocationsToSqlite()
+    convertlocationsSqliteJSONToSqlite()
 
 
 
