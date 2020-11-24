@@ -10,28 +10,32 @@ import lxml.html as etree
 import json
 from pandas import json_normalize
 
-filename = "DevonHealthKit_20200928.xml"
+download_folder = os.path.expanduser("~")+"/Downloads/"
+# filename = "DevonHealthKit_20200928.xml"
+HealthkitXML_filename = download_folder + "DevonHealthKit_20201119.xml"
+# Wv Dv Lv Dg
 username = "Devon"
 userid = "3"
-file_locations = "tblLocations.json"
-file_location = "tblLocation.json"
-download_folder = os.path.expanduser("~")+"/Downloads/"
+file_locations = download_folder + "tblLocations.json"
+file_location = download_folder + "tblLocation.json"
+file_health =  download_folder + "tblHealth_from_2020-08-24_db.json"
 
+# Django site temporarily uses sqlite db, production uses MySQL db
 django_prefix = 'getoutapp_'
 tblLocations = django_prefix + 'locations'
 tblLocation = django_prefix + 'location'
 
 
-def mainHealthKitToSqlite():
+def convert_HealthKitToSqlite3():
     # filename = sys.argv[1]
 
-    newfilename = str(filename).replace(".xml", "_sqllite3.txt")
+    newfilename = str(HealthkitXML_filename).replace(".xml", "_sqllite3.txt")
 
-    print(filename)
+    print(HealthkitXML_filename)
     print(newfilename)
 
     # read_file = open(filename, 'r')
-    healthxml = minidom.parse(filename)
+    healthxml = minidom.parse(HealthkitXML_filename)
     # <Record type="HKQuantityTypeIdentifierStepCount" sourceName="iphone" sourceVersion="11.4.1"
     # device="&lt;&lt;HKDevice: 0x2817c70c0&gt;, name:iPhone, manufacturer:Apple, model:iPhone,
     # hardware:iPhone9,1, software:11.4.1&gt;"
@@ -112,7 +116,7 @@ def mainHealthKitToSqlite():
 
 
 def main2():
-    root = etree.parse(filename)
+    root = etree.parse(HealthkitXML_filename)
     # for n in root.findall(".//record[@type]"):
     #     print(n.get("type"))
     # https://stackoverflow.com/questions/36656241/python-find-unique-xml-attributes
@@ -128,18 +132,19 @@ def main2():
     #  'HKQuantityTypeIdentifierDistanceWalkingRunning', 'HKQuantityTypeIdentifierFlightsClimbed'}
 
 
-def mainMySQLToSqlite():
-    filename = sys.argv[1]
+def convert_Locations_MySQLToSqlite3():
+    # filename = sys.argv[1]
+    filename = download_folder + "MySQL_route_inserts_walter1_303_20201112.txt"
     newfilename = str(filename).replace(".txt", "_sqllite3.txt")
 
     print(filename)
     print(newfilename)
 
     read_file = open(filename, 'r')
-    healthxml = minidom.parse(filename)
-    records = healthxml.getElementsByTagName('Record')
-    for elem in records:
-        print(elem.attributes['type'].value)
+    # healthxml = minidom.parse(filename)
+    # records = healthxml.getElementsByTagName('Record')
+    # for elem in records:
+    #     print(elem.attributes['type'].value)
 
     # -- INTO-health -> INTO getoutapp_health,
     # FROM-health -> FROM getoutapp_health,
@@ -184,7 +189,7 @@ def mainMySQLToSqlite():
     write_file.close()
 
 
-def convertlocationsSqliteJSONToSqlite():
+def convert_tblLocationsSqliteJSONToSqlite():
 
     # [ locations.json
     #     {
@@ -218,13 +223,13 @@ def convertlocationsSqliteJSONToSqlite():
     #         "Longitude": "-122.4084233",
     #         "TransitionId": ""
     #     }
-    with open(download_folder + file_locations) as f:
+    with open(file_locations) as f:
         locations_json = json.load(f)  # list object [{'Checked': '0', 'DateTime': '2020-03-23 12:34:46',   }]
     f.close()
     # for itm in locations_json:
     #     print(itm)
 
-    with open(download_folder + file_location) as f:
+    with open(file_location) as f:
         location_json = json.load(f)
     f.close()
 
@@ -250,7 +255,7 @@ def convertlocationsSqliteJSONToSqlite():
     write_file = open(download_folder + "jsonSqlite_locations" + filedatepart + ".txt", "w")
     tmpCnt = 0
     for index, row in df_locations.iterrows():
-        print(row['sort'], row['LocationsId'] + ' ' + row['DateTime'])
+        print(str(tmpCnt) + ': ' + row['LocationsId'] + ' ' + row['DateTime'])
 #       insert locations row
         ilogin_id = row['LoginId'] if row['LoginId'].__str__() != '0' else '1'
         spathname = row['PathName']
@@ -296,14 +301,87 @@ def convertlocationsSqliteJSONToSqlite():
             sSQLdjango2 = sSQLdjango2 + '(SELECT id FROM (SELECT MAX(id) AS id FROM ' + tblLocations + ") AS locs1)); \n"
             # print(sSQLdjango2)
             write_file.write(sSQLdjango2)
-        if tmpCnt > 1:
-            break
+        # if tmpCnt > 1:
+        #     break
 
     write_file.close()
 
+def convert_tblHealthSqliteJSONToSqlite():
+    print('convert_tblHealthSqliteJSONToSqlite')
+    # [
+    #     {
+    #         "CreationDate": "2020-01-05 00:00:00",
+    #         "Device": "",
+    #         "EndDate": "2020-01-05 09:59:13",
+    #         "Health_Id": "129",
+    #         "LoginId": "1",
+    #         "SourceName": "Pixel3a",
+    #         "SourceVersion": "",
+    #         "StartDate": "2020-01-05 11:36:39",
+    #         "Type": "TYPE_STEP_COUNT_CUMULATIVE",
+    #         "Unit": "count",
+    #         "Value": "6502"
+    #     },
+
+    with open(file_health) as f:
+        health_json = json.load(f)  # list object [{'Checked': '0', 'DateTime': '2020-03-23 12:34:46',   }]
+    f.close()
+    # for itm in locations_json:
+    #     print(itm)
+
+    # for rw in datajson:
+    #     print(rw['LocationsId'] + ' : ' + rw['DateTime'])
+    df_health = json_normalize(health_json)
+
+    # df = df.sort_values(['LocationsId', "DateTime"], ascending=True)  # convert string id to int val then sort
+    # https://stackoverflow.com/questions/37693600/how-to-sort-dataframe-based-on-particular-stringcolumns-using-python-pandas
+    # df['sort'] = df['LocationsId'].str.extract(r'(\d)', expand=False).astype(int)
+    df_health['sort'] = df_health['Health_Id'].astype(int)
+    df_health = df_health.sort_values(['sort'], ascending=True)
+    # https://stackoverflow.com/questions/29370057/select-dataframe-rows-between-two-dates
+    # filter on dates betwen 2020-01-01 and 2020-06-04
+    # greater than the start date and smaller than the end date
+    mask = (df_health['CreationDate'] > '2020-01-01') & (df_health['CreationDate'] <= '2020-06-05')
+    df_health = df_health.loc[mask]
+
+    now = datetime.now()
+    filedatepart = now.strftime("%Y%m%d%H%M")
+    write_file = open(download_folder + "jsonSqlite_health" + filedatepart + ".txt", "w")
+    tmpCnt = 0
+    for index, row in df_health.iterrows():
+        print(str(tmpCnt) + ': ' + row['Health_Id'] + ' ' + row['CreationDate'])
+#       insert health row
+        ilogin_id = row['LoginId'] if row['LoginId'].__str__() != '0' else '1'
+        sType = row['Type']
+        sSourceName = row['SourceName']
+        sUnit = row['Unit']
+        sCreationDate = row['CreationDate']
+        sStartDate = row['StartDate']
+        sEndDate = row['EndDate']
+        sValue = row['Value']
+        # izoomlevel = row['ZoomLevel'] if row['ZoomLevel'].__len__() != 0 else 'NULL'
+
+        sSQLdjango = "INSERT INTO getoutapp_health (type, sourcename, unit, creationdate, startdate, enddate, " \
+               "value, login_id) SELECT '" + sType + "','" + sSourceName \
+               + "','" + sUnit + "','" + sCreationDate + "','" \
+               + sStartDate + "','" + sEndDate \
+               + "'," + str(sValue) + "," + ilogin_id \
+               + " WHERE NOT EXISTS (SELECT * FROM getoutapp_health WHERE login_id = " + ilogin_id \
+               + " AND unit = '" + sUnit + "' AND creationdate = '" + sCreationDate + "'"\
+               + " AND startdate = '" + sStartDate + "' AND enddate = '" + sEndDate + "' LIMIT 1); \n"
+
+        # print(sSQLdjango)
+        write_file.write(sSQLdjango)
+        tmpCnt += 1
+        # if tmpCnt > 1:
+        #     break
+
+    write_file.close()
+
+
 if __name__ == '__main__':
-    # main()
-    convertlocationsSqliteJSONToSqlite()
-
-
+    # convert_Locations_MySQLToSqlite3()
+    # convert_HealthKitToSqlite3()
+    # convert_tblHealthSqliteJSONToSqlite()
+    convert_Locations_MySQLToSqlite3()
 
